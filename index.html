@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Snek</title>
+<head>
+<style>
+	.body {
+		padding: 10px;
+	}
+  .canvas{
+    border: 1px solid black;
+	height: 200px;
+	width: 200px;
+  }
+</style>
+</head>
+<body>
+	<canvas id="canvas" class="canvas" width=200 height=200></canvas>
+	<p>Longth: <span id="longth">0</span> High score: <span id="longthist">0</span></p>
+</body>
+<script>
+
+"use strict"
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const longthField = document.getElementById("longth")
+const longthistField = document.getElementById("longthist")
+const midpointW = canvas.width/2
+const midpointH = canvas.height/2
+const instructionsPath = new Path2D("M48 25 h15  v15  h-15  v-15  m3 4 l2 6 l2 -3 l2 3 l3 -6 m-12 15 h15  v15  h-15  v-15  m10 4 a2 2 0 0 0 -4 4 a3 2 0 1 1 -1 3 m-25 -11 h15  v15  h-15  v-15  m5 12 l2 -8 2 8 m-.5 -3 h-2  m33.5 -9 h15  v15  h-15  v-15  m5 4 v8  a4 3 0 1 0 0 -8 m25 -6 a4 4 0 1 0 .1 0 m7.9 9 v-9  a3 3 0 1 1 1 4 l5 4 m28 -26 h15 0 v15  h-15  v-15  m5 10 l3 -6 3 6 m-11 9 h15  v15  h-15  v-15 m5 6 l2 6 3 -6 m-30 -6 h15 v15 h-15 v-16 m10 6 l-6 3 6 3 m30 -11 h15 v15 h-15 v-15 m5 5 l6 3 -6 3 m-98 12 h70 v15 h-70 v-15 m14 13 v-10  a3 3 0 1 1 0 5 m6 5 l4 -9 4 9 m-8 -4 h8 m4 -5 v6  a1 1 0 1 0 5 0 v-6  m9 0 a2 2 0 1 0 -3 3 a3 2 0 1 1 -2 5 m15 -8 h-6  v8  h6  m-6 -4 h4");
+
+const keys = {};
+const loopTime = 30;
+const segmentSize = 10;
+const gridPoints = [ getGridPoints(canvas.width, segmentSize), getGridPoints(canvas.height, segmentSize) ]
+
+ctx.font = "18px sans-serif";
+ctx.textAlign = "center";
+
+
+canvas.addEventListener("mouseup", (e) => { 
+	restart(e.offsetX,  e.offsetY);
+	if (e.ctrlKey) { extraLife(); }
+	if (e.altKey) { lvlUp(); }
+});
+
+document.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if(e.code == "Space") { 
+	if (isPlaying) { playPause(); }
+	else { newGame(); }
+  } 
+});
+
+document.addEventListener("keyup", (e) => {
+  delete keys[e.code];
+});
+
+
+
+function numberSorterStoL(a,b){
+  return parseInt(a) - parseInt(b)
+}
+
+function numberSorterLtoS(a,b){
+  return parseInt(b) - parseInt(a)
+}
+
+function checkIfSomeBetweenPoints(point1, point2, ...testPoints) {
+  let array = [point1, point2, ...testPoints].sort(numberSorterStoL);
+}
+
+function checkIfInArea(areaCoordinants, testPoint){
+  if ( [areaCoordinants[0],areaCoordinants[2],testPoint[0]].sort(numberSorterStoL).indexOf(testPoint[0]) == 1 &&
+	   [areaCoordinants[1],areaCoordinants[3],testPoint[1]].sort(numberSorterStoL).indexOf(testPoint[1]) == 1
+	  ) { return true; }
+  return false;
+}
+
+function randBetween(max,min){
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
+function clearCanvas(){
+  ctx.clearRect(0,0,canvas.width,canvas.height)
+}
+
+function drawCircle(x,y,r,fill = false) {
+	ctx.beginPath();
+	ctx.ellipse(x,y,r,r,0,0,Math.PI*2);
+	if(fill){ 
+		ctx.fill()
+	} else {
+		ctx.stroke();
+	}
+}
+
+function drawScale(coord,radius){
+	let xOffset = radius-3;
+	let yOffset = radius-2;
+	if(coord.horazontal) {
+		xOffset++;
+		yOffset--;
+	}
+	ctx.beginPath();
+	ctx.moveTo(coord.x - xOffset, coord.y);
+	ctx.lineTo(coord.x, coord.y - yOffset);
+	ctx.lineTo(coord.x + xOffset, coord.y);
+	ctx.lineTo(coord.x, coord.y + yOffset);
+	ctx.lineTo(coord.x - xOffset, coord.y);
+	ctx.stroke();
+}	
+
+
+
+class Snek {
+		startingLength = 2;
+		rateOfMovement = 15;
+		sppedIncreaseRate = 13
+	constructor(gridPoints, size, isDemo = false) {
+		this.length = this.startingLength;
+		this.segmentSize = size;
+		this.positions = new Array();
+		this.makeStartingSegments(gridPoints);
+		this.movementCounter = this.rateOfMovement;
+		this.xMove = 1;
+		this.yMove = 0;
+		this.direction = "L"
+		this.lastMoved = "L"
+		this.movable = true;
+		this.demo = isDemo
+	}
+
+	makeStartingSegments(points) {
+		let startX = points[0][Math.round(points[0].length/2)];
+		let startY = points[1][Math.round(points[1].length/2) +3];
+		console.log(startX, startY);
+		for( let i=0; i<this.startingLength; i++) {
+			this.positions.push( new Coord(startX - this.segmentSize * i, startY));
+			this.positions.push( new Segment(startX - this.segmentSize * i, startY, true));
+		}
+	}
+	
+	getPositions() {
+		return this.positions;
+	}
+	
+	getLength() {
+		return this.positions.length;
+	}
+	
+	checkDirection() {
+		if ((keys.KeyW || keys.ArrowUp) && this.lastMoved != "D") {
+			this.setDirectionUp()
+			return;
+		}
+		if ((keys.KeyA || keys.ArrowLeft) && this.lastMoved != "R") {
+			this.setDirectionLeft()
+			return;
+		}
+		if ((keys.KeyS || keys.ArrowDown) && this.lastMoved != "U") {
+			this.setDirectionDown()
+			return;
+		}
+		if ((keys.KeyD || keys.ArrowRight) && this.lastMoved != "L") {
+			this.setDirectionRight()
+			return;
+		}
+	}
+	
+	setDirection(dir) {
+		switch(dir) {
+			case "U":
+				this.setDirectionUp();
+				break;
+			case "D":
+				this.setDirectionDown();
+				break;
+			case "L":
+				this.setDirectionLeft();
+				break;
+			case "R":
+				this.setDirectionRight();
+				break;
+		}
+	}
+	
+	setDirectionUp() {
+		this.xMove = 0;
+		this.yMove = -1;
+		this.direction = "U";
+	}
+
+	setDirectionDown() {
+		this.xMove = 0;
+		this.yMove = 1;
+		this.direction = "D";
+	}
+
+	setDirectionLeft() {
+		this.xMove = -1
+		this.yMove = 0;
+		this.direction = "L";
+	}
+
+	setDirectionRight() {
+		this.xMove = 1;
+		this.yMove = 0;
+		this.direction = "R";
+	}
+
+	checkMovement() {
+		if (this.movementCounter-- <= 0) {
+			this.movementCounter = this.rateOfMovement;
+			this.move();
+		}
+	}
+
+	move() {
+		let head = this.positions[0];
+		//this.positions.unshift( new Coord(
+		//	head.x + this.segmentSize * this.xMove,
+		//	head.y + this.segmentSize * this.yMove
+		//));
+		this.positions.unshift( new Segment(
+			head.x + this.segmentSize * this.xMove,
+			head.y + this.segmentSize * this.yMove,
+			(Math.abs(this.xMove)==1)
+		));
+		while(this.positions.length > this.length) {
+			this.positions.pop();
+		}
+		//console.log("moving direction: ", this.direction);
+		this.lastMoved = this.direction;
+		this.moved = true;
+	}
+
+	checkForApple() {
+		if (this.demo) { return; }
+		let head = this.positions[0];
+		if (head.sameAs(at.getApple())) {
+			at.chomp();
+			this.length++;
+			this.checkSpeed();
+		}
+	}
+	
+	checkOuroboros() {
+		let head  = this.positions[0];
+		for (let i=1; i < this.positions.length; i++){
+			if(head.sameAs(this.positions[i])){
+				this.movable = false;
+				gameOver();
+			}
+		}
+	}
+	
+	checkWall(){
+		let head  = this.positions[0];
+		
+		if(!checkIfInArea([0,0,canvas.width,canvas.height],[head.x,head.y])){
+				this.movable = false;
+				gameOver();
+		}
+	}
+	
+	checkSpeed() {
+		if(this.positions.length % this.sppedIncreaseRate == 0 && this.rateOfMovement > 1){
+			this.rateOfMovement--;
+			console.log("gotta go fast", loopTime/this.rateOfMovement);
+		}
+	}
+	
+	draw() {
+		let head = this.positions[0];
+
+		this.positions.forEach(c => {
+			drawCircle(c.x, c.y, this.segmentSize/2);
+		});
+		let xOffset = 0;
+		let yOffset = 3;
+		if(this.direction.match(/[UD]/)){
+			xOffset = 3;
+			yOffset = 0;
+		}
+		drawCircle(head.x + xOffset, head.y + yOffset, 2, true);
+		drawCircle(head.x - xOffset, head.y - yOffset, 2, true);
+		
+		//for (let i=1; i<this.positions.length; i++) {
+		//	drawScale(this.positions[i], this.segmentSize/2);
+		//}
+	}
+	
+	tick() {
+		if(this.movable){
+			this.checkDirection();
+			this.checkMovement();
+			if(this.moved){
+				this.checkForApple();
+				this.checkOuroboros();	
+				this.checkWall();
+				this.moved = false;
+			}
+		}
+		this.draw();
+	}
+}
+
+class AppleTree {
+	constructor(points) {
+		this.xPoints = points[0];
+		this.xMax = points[0].length -1;
+		this.yPoints = points[1];
+		this.yMax = points[1].length -1;
+		this.radius = (segmentSize - 2)/2
+		this.chomp();
+	}
+	
+	chomp(){
+		this.apple = this.growNewApple(snek.getPositions());
+	}
+	
+	getApple(){
+		return this.apple;
+	}
+	
+	growNewApple(snake) {
+		let point = new Coord(
+			this.xPoints.at(randBetween(0,this.xMax)),
+			this.yPoints.at(randBetween(0,this.yMax))
+		);
+		while (snake.some(s => {
+			return s.sameAs(point);
+		})) {
+			console.log("re-rolling point");
+			point = new Coord(
+				this.xPoints.at(randBetween(0,this.xMax)),
+				this.yPoints.at(randBetween(0,this.yMax))
+			);		
+		}
+		return point;
+	}
+	
+	draw() {
+		drawCircle(this.apple.x, this.apple.y, this.radius, true);
+	}
+	
+	tick() {
+		this.draw();
+	}
+}
+
+class Coord {
+	constructor(x=0, y=0){
+		this.x = x;
+		this.y = y;
+	}
+	
+	sameAs(other) {
+		return (this.x == other.x && this.y == other.y)
+	}
+}
+
+class Segment extends Coord {
+	constructor(x=0, y=0, horazontal=false){
+		super(x,y);
+		this.horazontal = horazontal
+	}
+}
+
+
+function startScreenLoop() {
+	clearCanvas();
+	ctx.stroke(instructionsPath);
+	ctx.strokeRect(70,90,60,30)
+	ctx.fillText("Start", midpointW, 110);
+	//console.debug(idleSnekInputCounter, idleSnek.movementCounter);
+	if (idleSnekInputCounter-- <= 0) {
+		idleSnekInputCounter = idleSnek.rateOfMovement;
+		//console.log("sending direction: ",idlePath[idlePointer]);
+		idleSnek.setDirection(idlePath[idlePointer]);
+		if (++idlePointer >= idlePath.length) {
+			idlePointer = 0;
+		}
+	}
+	idleSnek.tick();
+}
+
+function gameOver() {
+	isPlaying = false;
+	clearInterval(looping);
+	looping = setInterval(gameOverLoop, loopTime);
+}
+
+function gameOverLoop() {
+	clearCanvas();
+	
+	snek.tick();
+	at.tick();
+	
+	ctx.clearRect(0,45,canvas.width,30);
+	ctx.clearRect(70,90,60,30);
+	ctx.strokeRect(70,90,60,30);
+	ctx.fillText("G A M E   O V E R", midpointW, 69);
+	ctx.fillText("G A M E   O V E R", midpointW, 69);
+	ctx.fillText("G A M E   O V E R", midpointW, 69);	// net effect makes the text look bolder
+	ctx.fillText("Retry", midpointW, 110);
+}
+
+function newGame() {
+	clearInterval(looping);
+	isPlaying = true;
+	snek = new Snek(gridPoints , segmentSize);
+	at = new AppleTree(gridPoints);
+	cheating = false;
+	longthField.innerText = 0;
+	looping = setInterval(gamePlayLoop, loopTime);
+}
+
+function restart(x,y) {
+	let restartButton = [70,90,130,120];
+	if (!isPlaying && checkIfInArea(restartButton, [x,y])){
+		newGame();
+	}
+}
+
+function getGridPoints(gridSize, segmentSize) {
+	let offset = segmentSize/2;
+	let numbers = new Array();
+	for (var i=0; i <= gridSize - offset; i+=segmentSize){
+		numbers.push(i + offset);
+	}
+	return numbers;
+}
+
+function updateScore(score) {
+	longthField.innerText = score;
+	if (score > highScore) {
+	    updateHighScore(score);
+	}
+}
+
+function updateHighScore(score){
+	if(!cheating){
+		longthistField.innerText = score;
+		highScore = score;
+		localStorage.setItem("highScore",score)
+	}
+}
+
+function getHighScore(){
+	let score = parseInt(localStorage.getItem("highScore"));
+	if (isNaN(score)) { return 0; }
+	return score;
+}
+
+function playPause() {
+	if(isLooping){
+		clearInterval(looping);
+		isLooping = false;
+	} else {
+		looping = setInterval(gamePlayLoop, loopTime);
+		isLooping = true;
+	}
+}
+
+function oneFrame() {
+	//gamePlayLoop();
+	startScreenLoop();
+}
+
+function gamePlayLoop() {
+	clearCanvas();
+	snek.tick();
+	at.tick();
+	updateScore(snek.getLength());
+}
+
+function extraLife() {
+	cheating = true;
+	setTimeout(function() { ctx.fillText("3", midpointW, midpointH) },1000);
+	setTimeout(function() { ctx.fillText("2", midpointW, midpointH) },2000);
+	setTimeout(function() { ctx.fillText("1", midpointW, midpointH) },3000);
+	setTimeout( function(){
+		isPlaying = true;
+		snek.movable = true;
+	},4000);
+}
+
+function lvlUp() {
+	ctx.fillText("L E V E L   U P", canvas.width/2, canvas.height/2);
+	cheating = true;
+	snek.length += snek.sppedIncreaseRate;
+	snek.rateOfMovement--;
+}
+
+function setup(){
+	highScore = getHighScore();
+	longthistField.innerText = highScore;
+	idleSnek = new Snek(gridPoints , segmentSize, true);
+	idleSnek.length = 18;
+	idleSnek.rateOfMovement = 9;
+	idleSnekInputCounter = idleSnek.rateOfMovement;
+	idlePointer = 0;
+	idlePath = ['R','R','R','R','R','R','R','D','D','D','L','L','D','L','L','L','U','L','L','U','U','L','L','L','U','L','L','D','D','L','L','L','D','D','D','R','R','R','R','R','U','R','R','U','U','R','U','U'];
+}
+
+var snek, at, highScore, cheating, idleSnek, idleSnekInputCounter, idlePointer, idlePath
+setup();
+var looping = setInterval(startScreenLoop, loopTime);
+var isPlaying = false;
+var isLooping = true;
+//clearInterval(looping);
+</script>
