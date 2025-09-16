@@ -3,42 +3,191 @@
 <title>Snek</title>
 <head>
 <style>
-	.body {
+	body {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-direction: column;
 		padding: 10px;
+		touch-action: manipulation;
 	}
-  .canvas{
-    border: 1px solid black;
-	height: 200px;
-	width: 200px;
-  }
+	.outlined{
+		border: 1px solid black;
+	}
+	.longth {
+		display: flex;
+		justify-content: space-around;
+		width: 50vw;
+		margin: 2vh;
+		font-size: xxx-large;
+	}
 </style>
 </head>
 <body>
-	<canvas id="canvas" class="canvas" width=200 height=200></canvas>
-	<p>Longth: <span id="longth">0</span> High score: <span id="longthist">0</span></p>
+	<div class="longth">
+	<div>Longth: <span id="longth">0</span></div>
+	<div> High score: <span id="longthist">0</span></div>
+	</div>
+	<canvas id="mainCanvas" width=0 height=0></canvas>
+	<canvas id="buttonCanvas" width=0 height=0></canvas>
 </body>
+<script src=".\canvasButtons.js"></script>
 <script>
 
 "use strict"
 
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const mainCanvas = document.getElementById("mainCanvas");
+const ctx = mainCanvas.getContext("2d");
+const buttonCanvas = document.getElementById("buttonCanvas");
 const longthField = document.getElementById("longth")
 const longthistField = document.getElementById("longthist")
-const midpointW = canvas.width/2
-const midpointH = canvas.height/2
-const instructionsPath = new Path2D("M48 25 h15  v15  h-15  v-15  m3 4 l2 6 l2 -3 l2 3 l3 -6 m-12 15 h15  v15  h-15  v-15  m10 4 a2 2 0 0 0 -4 4 a3 2 0 1 1 -1 3 m-25 -11 h15  v15  h-15  v-15  m5 12 l2 -8 2 8 m-.5 -3 h-2  m33.5 -9 h15  v15  h-15  v-15  m5 4 v8  a4 3 0 1 0 0 -8 m25 -6 a4 4 0 1 0 .1 0 m7.9 9 v-9  a3 3 0 1 1 1 4 l5 4 m28 -26 h15 0 v15  h-15  v-15  m5 10 l3 -6 3 6 m-11 9 h15  v15  h-15  v-15 m5 6 l2 6 3 -6 m-30 -6 h15 v15 h-15 v-16 m10 6 l-6 3 6 3 m30 -11 h15 v15 h-15 v-15 m5 5 l6 3 -6 3 m-98 12 h70 v15 h-70 v-15 m14 13 v-10  a3 3 0 1 1 0 5 m6 5 l4 -9 4 9 m-8 -4 h8 m4 -5 v6  a1 1 0 1 0 5 0 v-6  m9 0 a2 2 0 1 0 -3 3 a3 2 0 1 1 -2 5 m15 -8 h-6  v8  h6  m-6 -4 h4");
-
 const keys = {};
 const loopTime = 30;
-const segmentSize = 10;
-const gridPoints = [ getGridPoints(canvas.width, segmentSize), getGridPoints(canvas.height, segmentSize) ]
+const gridWidth = 20;
+const gridHeight = 25;
+
+const buttonConfig = {
+	buttonSpaceSize: 1,  // percentage of the height canvas that the buttons should take up expressed as a decimal
+	layout : "FourButtonDpadPause",
+	drawSpacer : false,
+	action: {
+		shapes: {
+			elipse: {
+				optionVariable : 0  // I really can't think of anything to put here
+			},
+			octogon: {
+				sideCutout : .25 // percentage of each side that gets cut out to form the diagional sides of the octogon
+			},
+			roundedRect: {
+				borderRadius : .25
+			}
+		},
+		colors: {
+			defaultOutlineColor: "#222",
+			defaultFillColor: "#333",
+			defaultHighlightColor: "#c00"
+		}
+	},
+	arrows: {
+		LRpoint: .35, // percentage of the width of the button range to move in to start the point
+		TBpoint: .5, // percentage of the hight of the button range to move in to start the point
+		colors: {
+			defaultOutlineColor: "#222",
+			defaultFillColor: "#333",
+			defaultHighlightColor: "#DD0"
+		}
+	}
+}
+
+
+canvasSetup();
+
+const segmentSize = determineSegmentSize();
+
+adjustCanvasSize();
+
+
+const midpointW = mainCanvas.width/2
+const midpointH = mainCanvas.height/2
+const instructionsPath = getInstructionPath();
+const startButtonRange = getStartButtonRange();
+
+const gridPoints = [ getGridPoints(mainCanvas.width, segmentSize), getGridPoints(mainCanvas.height, segmentSize) ]
 
 ctx.font = "18px sans-serif";
 ctx.textAlign = "center";
+ctx.lineWidth = 2;
 
 
-canvas.addEventListener("mouseup", (e) => { 
+let restartButton = new CoordinantRange(70,90,130,120)
+
+
+
+function canvasSetup() {
+//	if (mobileBrowser()) { //?.mobile) {
+	if (isTallerThanWide()) {
+		canvasSetupMobile();
+		return;
+	}
+		canvasSetupDesktop();
+}
+
+function isTallerThanWide() {
+	return window.innerHeight > window.innerWidth;
+}
+
+function canvasSetupDesktop() {
+	let width = 500; //390;
+	let height = 625; //600;
+	
+	if ( window.innerWidth < width ){
+		width = parseInt(Math.floor(window.innerWidth * .095)) * 10;
+		height = parseInt(Math.round(width * .15)) * 10;
+	}
+	if ( window.innerHeight < height ) {
+	
+	}
+	sizeCanvas(mainCanvas, width, height);
+	mainCanvas.classList.add("outlined");
+}
+
+function canvasSetupMobile() {
+	let width = parseInt(Math.floor(window.innerWidth * .095)) * 10;
+	let height = parseInt(Math.round(width * .15)) * 10;
+	let maxHeight = Math.floor(window.innerHeight * .075) * 10;
+	let butonHeight = parseInt(Math.floor(window.innerHeight * .02)) * 10
+
+	if (height > maxHeight) {
+		height = parseInt(maxHeight);
+		width = parseInt(Math.round(height * .065)) * 10;
+	}
+
+	sizeCanvas(mainCanvas, width, height);
+	sizeCanvas(buttonCanvas, width, butonHeight);
+	mainCanvas.classList.add("outlined");
+	buttonCanvas.classList.add("outlined");
+}
+
+function sizeCanvas(canvas, width, height) {
+	canvas.width = width;
+	canvas.height = height;
+}
+
+function determineSegmentSize() {
+	let horizontal = Math.floor(mainCanvas.width / gridWidth);
+	let vertical = Math.floor(mainCanvas.height / gridHeight);
+	
+	return Math.min(horizontal, vertical);
+}
+
+function adjustCanvasSize() {
+	let newWidth = segmentSize * gridWidth;
+	let newHeight = segmentSize * gridHeight;
+	
+	sizeCanvas(mainCanvas, newWidth, newHeight);
+	if ( buttonCanvas.width > 1 ) {
+		sizeCanvas(buttonCanvas, newWidth, buttonCanvas.height);
+	}
+}
+
+function setupCanvasButons() {
+ canvasButtons = new CanvasButtons(buttonCanvas, buttonConfig);
+ buttonCanvas.addEventListener("mousedown", e => canvasButtons.handleClickDown(e));
+ buttonCanvas.addEventListener("mouseup", e => canvasButtons.handleClickUp(e));
+ buttonCanvas.addEventListener("touchstart", e => canvasButtons.handleTouchDown(e));
+ buttonCanvas.addEventListener("touchend", e => canvasButtons.handleTouchUp(e));
+}
+
+function sendButtonsToKeys() {
+	let buttons = Object.keys(canvasButtons.values);
+	buttons.forEach(btn => {
+		keys[btn] = canvasButtons.values[btn]
+	});
+}
+
+
+
+mainCanvas.addEventListener("mouseup", (e) => { 
 	restart(e.offsetX,  e.offsetY);
 	if (e.ctrlKey) { extraLife(); }
 	if (e.altKey) { lvlUp(); }
@@ -56,7 +205,27 @@ document.addEventListener("keyup", (e) => {
   delete keys[e.code];
 });
 
+function getInstructionPath() {
+//	if (mobileBrowser()) { return new Path2D("M0 0"); }
+	if (isTallerThanWide()) { return new Path2D("M0 0"); }
+	let startX = mainCanvas.width / 2 - 55;
+	let startY = mainCanvas.height * .2;
+	return new Path2D(`M${startX} ${startY} h15  v15  h-15  v-15  m3 4 l2 6 l2 -3 l2 3 l3 -6 m-12 15 h15  v15  h-15  v-15  m10 4 a2 2 0 0 0 -4 4 a3 2 0 1 1 -1 3 m-25 -11 h15  v15  h-15  v-15  m5 12 l2 -8 2 8 m-.5 -3 h-2  m33.5 -9 h15  v15  h-15  v-15  m5 4 v8  a4 3 0 1 0 0 -8 m25 -6 a4 4 0 1 0 .1 0 m7.9 9 v-9  a3 3 0 1 1 1 4 l5 4 m28 -26 h15 0 v15  h-15  v-15  m5 10 l3 -6 3 6 m-11 9 h15  v15  h-15  v-15 m5 6 l2 6 3 -6 m-30 -6 h15 v15 h-15 v-16 m10 6 l-6 3 6 3 m30 -11 h15 v15 h-15 v-15 m5 5 l6 3 -6 3 m-98 12 h70 v15 h-70 v-15 m14 13 v-10  a3 3 0 1 1 0 5 m6 5 l4 -9 4 9 m-8 -4 h8 m4 -5 v6  a1 1 0 1 0 5 0 v-6  m9 0 a2 2 0 1 0 -3 3 a3 2 0 1 1 -2 5 m15 -8 h-6  v8  h6  m-6 -4 h4`);
+}
 
+function getStartButtonRange() {
+	let x1 = parseInt(mainCanvas.width * .375);
+	let x2 = parseInt(mainCanvas.width * .625);
+	let y1 = parseInt(mainCanvas.height * .45);
+	let y2 = parseInt(y1 + ((x2 - x1) * .33));
+	return new CoordinantRange(x1,y1,x2,y2);
+}
+
+function drawStartButon(txt = "") {
+	startButtonRange.clear(ctx);
+	startButtonRange.write(txt,ctx);
+	startButtonRange.draw(ctx);
+}
 
 function numberSorterStoL(a,b){
   return parseInt(a) - parseInt(b)
@@ -82,7 +251,7 @@ function randBetween(max,min){
 }
 
 function clearCanvas(){
-  ctx.clearRect(0,0,canvas.width,canvas.height)
+  ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height)
 }
 
 function drawCircle(x,y,r,fill = false) {
@@ -93,6 +262,12 @@ function drawCircle(x,y,r,fill = false) {
 	} else {
 		ctx.stroke();
 	}
+}
+
+function drawArc(x,y,radius,rotation,start,end,cc=false) {
+	ctx.beginPath()
+	ctx.ellipse(x,y,radius,radius,rotation,start,end,cc);
+	ctx.stroke();
 }
 
 function drawScale(coord,radius){
@@ -111,12 +286,11 @@ function drawScale(coord,radius){
 	ctx.stroke();
 }	
 
-
-
 class Snek {
 		startingLength = 2;
 		rateOfMovement = 15;
 		sppedIncreaseRate = 13
+		color = "#7A6"
 	constructor(gridPoints, size, isDemo = false) {
 		this.length = this.startingLength;
 		this.segmentSize = size;
@@ -125,8 +299,8 @@ class Snek {
 		this.movementCounter = this.rateOfMovement;
 		this.xMove = 1;
 		this.yMove = 0;
-		this.direction = "L"
-		this.lastMoved = "L"
+		this.direction = "R"
+		this.lastMoved = "R"
 		this.movable = true;
 		this.demo = isDemo
 	}
@@ -134,15 +308,17 @@ class Snek {
 	makeStartingSegments(points) {
 		let startX = points[0][Math.round(points[0].length/2)];
 		let startY = points[1][Math.round(points[1].length/2) +3];
-		console.log(startX, startY);
-		for( let i=0; i<this.startingLength; i++) {
-			this.positions.push( new Coord(startX - this.segmentSize * i, startY));
-			this.positions.push( new Segment(startX - this.segmentSize * i, startY, true));
-		}
+		this.head = new Coord(startX, startY);
+		//for( let i=0; i<this.startingLength; i++) {
+		for( let i=1; i<=this.startingLength; i++) {
+//			this.positions.push( new Coord(startX - this.segmentSize * i, startY));
+//			this.positions.push( new Segment(startX - this.segmentSize * i, startY, true));
+			this.positions.push( new Segment(startX - this.segmentSize * i, startY));
+		} 
 	}
 	
 	getPositions() {
-		return this.positions;
+		return this.positions.concat([this.head]);
 	}
 	
 	getLength() {
@@ -150,19 +326,19 @@ class Snek {
 	}
 	
 	checkDirection() {
-		if ((keys.KeyW || keys.ArrowUp) && this.lastMoved != "D") {
+		if ((keys.KeyW || keys.ArrowUp || keys.Up) && this.lastMoved != "D") {
 			this.setDirectionUp()
 			return;
 		}
-		if ((keys.KeyA || keys.ArrowLeft) && this.lastMoved != "R") {
+		if ((keys.KeyA || keys.ArrowLeft || keys.Left) && this.lastMoved != "R") {
 			this.setDirectionLeft()
 			return;
 		}
-		if ((keys.KeyS || keys.ArrowDown) && this.lastMoved != "U") {
+		if ((keys.KeyS || keys.ArrowDown || keys.Down) && this.lastMoved != "U") {
 			this.setDirectionDown()
 			return;
 		}
-		if ((keys.KeyD || keys.ArrowRight) && this.lastMoved != "L") {
+		if ((keys.KeyD || keys.ArrowRight || keys.Right) && this.lastMoved != "L") {
 			this.setDirectionRight()
 			return;
 		}
@@ -217,11 +393,35 @@ class Snek {
 	}
 
 	move() {
+		//currently, head is the segment at positions 0.
+		// If we make head a coord and store it seperately, we can use its coordinants to feed the three sets of XY pairs needed for the new Segment
+		let newHead = new Coord(
+			this.head.x + this.segmentSize * this.xMove,
+			this.head.y + this.segmentSize * this.yMove
+		);
+		let newSegment = new Segment(
+			this.head.x,
+			this.head.y,
+			newHead.x,
+			newHead.y,
+			this.positions[0].x,
+			this.positions[0].y,
+		);
+		this.head = newHead;
+		this.positions.unshift(newSegment)
+	
+		while(this.positions.length > this.length) {
+			this.positions.pop();
+		}
+		this.lastMoved = this.direction;
+		this.moved = true;
+	}
+
+	old_move() {
 		let head = this.positions[0];
-		//this.positions.unshift( new Coord(
-		//	head.x + this.segmentSize * this.xMove,
-		//	head.y + this.segmentSize * this.yMove
-		//));
+		//currently, head is the segment at positions 0.
+		// If we make head a coord and store it seperately, we can use its coordinants to feed the three sets of XY pairs needed for the new Segment
+		
 		this.positions.unshift( new Segment(
 			head.x + this.segmentSize * this.xMove,
 			head.y + this.segmentSize * this.yMove,
@@ -237,8 +437,9 @@ class Snek {
 
 	checkForApple() {
 		if (this.demo) { return; }
-		let head = this.positions[0];
-		if (head.sameAs(at.getApple())) {
+		//let head = this.positions[0];
+		//if (head.sameAs(at.getApple())) {
+		if (this.head.sameAs(at.getApple())) {
 			at.chomp();
 			this.length++;
 			this.checkSpeed();
@@ -246,9 +447,10 @@ class Snek {
 	}
 	
 	checkOuroboros() {
-		let head  = this.positions[0];
+	//	let head  = this.positions[0];
 		for (let i=1; i < this.positions.length; i++){
-			if(head.sameAs(this.positions[i])){
+	//		if(head.sameAs(this.positions[i])){
+			if(this.head.sameAs(this.positions[i])){
 				this.movable = false;
 				gameOver();
 			}
@@ -256,9 +458,10 @@ class Snek {
 	}
 	
 	checkWall(){
-		let head  = this.positions[0];
+		//let head  = this.positions[0];
 		
-		if(!checkIfInArea([0,0,canvas.width,canvas.height],[head.x,head.y])){
+		//if(!checkIfInArea([0,0,mainCanvas.width,mainCanvas.height],[head.x,head.y])){
+		if(!checkIfInArea([0,0,mainCanvas.width,mainCanvas.height],[this.head.x,this.head.y])){
 				this.movable = false;
 				gameOver();
 		}
@@ -272,25 +475,56 @@ class Snek {
 	}
 	
 	draw() {
-		let head = this.positions[0];
-
 		this.positions.forEach(c => {
-			drawCircle(c.x, c.y, this.segmentSize/2);
+			c.draw();
 		});
-		let xOffset = 0;
-		let yOffset = 3;
-		if(this.direction.match(/[UD]/)){
-			xOffset = 3;
-			yOffset = 0;
-		}
-		drawCircle(head.x + xOffset, head.y + yOffset, 2, true);
-		drawCircle(head.x - xOffset, head.y - yOffset, 2, true);
-		
-		//for (let i=1; i<this.positions.length; i++) {
-		//	drawScale(this.positions[i], this.segmentSize/2);
-		//}
+		this.drawHead()
+		this.drawTongue();
 	}
 	
+	drawHead() {
+		ctx.save();
+		ctx.fillStyle = this.color;
+		drawCircle(this.head.x, this.head.y, this.segmentSize/2)
+		drawCircle(this.head.x, this.head.y, this.segmentSize/2, true)
+		ctx.restore();
+
+		let eyesize = this.segmentSize * .15
+		let offset = this.segmentSize * .2
+
+		drawCircle(this.head.x - (offset * this.yMove), this.head.y - (offset * this.xMove),eyesize ,true)
+		drawCircle(this.head.x + (offset * this.yMove), this.head.y + (offset * this.xMove),eyesize ,true)
+	}
+	
+	drawTongue() {
+		let radius = this.segmentSize/2
+		let noseX = this.head.x + this.xMove * radius
+		let noseY = this.head.y + this.yMove * radius
+		
+		let offset1 = [noseX + (radius * this.yMove), noseY + (radius * this.xMove)];
+		let offset2 = [noseX + (radius * this.yMove * -1), noseY + (radius * this.xMove * -1)];
+		let rotation = this.getTongueRotation();
+		
+		drawArc(offset1[0], offset1[1], radius, Math.PI * rotation[0], Math.PI * 1.75, 0);
+		drawArc(offset2[0], offset2[1], radius, Math.PI * rotation[1], Math.PI, Math.PI * 1.25);
+	/*
+		let p3 = new Path2D(
+		`M${noseX} ${noseY} a${radius} ${radius} 0 0 0  ${radius * -.5} ${radius * -.75}
+		M${noseX} ${noseY} a${radius} ${radius} 0 0 1  ${radius * .5} ${radius * -.75}`
+		)
+		ctx.stroke(p3);
+	*/
+	
+	}
+	getTongueRotation() {
+		switch(this.direction) {
+			case "U" : return [0,0];
+			case "D" : return [1,1];
+			case "L" : return [.75, .25];
+			case "R" : return [1.75, 1.25];		
+		}
+
+	}
 	tick() {
 		if(this.movable){
 			this.checkDirection();
@@ -318,6 +552,7 @@ class AppleTree {
 	
 	chomp(){
 		this.apple = this.growNewApple(snek.getPositions());
+		this.stem = this.getStemPath();
 	}
 	
 	getApple(){
@@ -340,9 +575,27 @@ class AppleTree {
 		}
 		return point;
 	}
-	
+	getStemPath() {
+		let appleTop = this.apple.y - this.radius; 
+		
+		return new Path2D(`
+			M${this.apple.x} ${appleTop} 
+			a${this.radius} ${this.radius} 0 0 0  ${this.radius * -.85} ${this.radius * -.75}
+			a${this.radius} ${this.radius} 0 0 0  ${this.radius * .85} ${this.radius * .75}
+			a${this.radius} ${this.radius} 0 0 1  ${this.radius * .5} ${this.radius * -.75}
+		`);
+	}
 	draw() {
+		ctx.save();
+		ctx.fillStyle = "#C00";
+		drawCircle(this.apple.x, this.apple.y, this.radius);
 		drawCircle(this.apple.x, this.apple.y, this.radius, true);
+		ctx.restore();
+		ctx.save();
+		this.fillStyle = "#7A6";
+		ctx.fill(this.stem);
+		ctx.stroke(this.stem);
+		ctx.restore();
 	}
 	
 	tick() {
@@ -362,18 +615,64 @@ class Coord {
 }
 
 class Segment extends Coord {
-	constructor(x=0, y=0, horazontal=false){
+		radii = segmentSize/2
+		stripeLength = .7
+		stripeWidth = .4
+		color = "#7A6"
+	constructor(x=0, y=0, nextX = undefined, nextY = undefined, lastX = undefined, lastY = undefined) {
 		super(x,y);
-		this.horazontal = horazontal
+		this.stripe = this.setStripe(nextX, nextY, lastX, lastY);
+	}
+	draw() {
+		ctx.save()
+		ctx.fillStyle = this.color;
+		drawCircle(this.x, this.y, this.radii, true)
+		drawCircle(this.x, this.y, this.radii)
+		ctx.stroke(this.stripe);
+		ctx.restore();
+	}
+	setStripe(nextX, nextY, lastX, lastY) {
+		lastX = (lastX) ? lastX : this.x - 1;	//
+		lastY = (lastY) ? lastY : this.y;
+		nextX = (nextX) ? nextX : this.x + 1;
+		nextY = (nextY) ? nextY : this.y;
+		
+		let offset = this.radii * this.stripeWidth;
+		let length = this.radii * this.stripeLength;
+		let prevModifiers = this.getDirectionModifiers(lastX, lastY);
+		let nextModifiers = this.getDirectionModifiers(nextX, nextY);
+		
+		// offset is being multiplied by the absolute value of the opposite modifier to make sure it gets shifted left/right or up/down but not both
+		let backX1 = this.x + (offset * Math.abs(prevModifiers[1])) + (length * prevModifiers[0]);
+		let backX2 = this.x - (offset * Math.abs(prevModifiers[1])) + (length * prevModifiers[0]);
+		let backY1 = this.y + (offset * Math.abs(prevModifiers[0])) + (length * prevModifiers[1]);
+		let backY2 = this.y - (offset * Math.abs(prevModifiers[0])) + (length * prevModifiers[1]);
+		
+		// these coordinates are at the edge of the circle in the direction of the next segment
+		let nextXpoint = this.x + (length * 1.25 * nextModifiers[0]);	
+		let nextYpoint = this.y + (length * 1.25 * nextModifiers[1]);
+		
+		let frontX1 = nextXpoint + (offset * Math.abs(nextModifiers[1])) - (length * nextModifiers[0]);
+		let frontX2 = nextXpoint - (offset * Math.abs(nextModifiers[1])) - (length * nextModifiers[0]);
+		let frontY1 = nextYpoint + (offset * Math.abs(nextModifiers[0])) - (length * nextModifiers[1]);
+		let frontY2 = nextYpoint - (offset * Math.abs(nextModifiers[0])) - (length * nextModifiers[1]);
+		
+		this.pathString = `M${backX1} ${backY1} L${this.x} ${this.y} L${backX2} ${backY2}
+			 M${frontX1} ${frontY1} L${nextXpoint} ${nextYpoint} L${frontX2} ${frontY2}
+			`
+		return new Path2D(this.pathString);
+	}
+	getDirectionModifiers(tx,ty) {
+		return [Math.sign(tx - this.x), Math.sign(ty - this.y)];
 	}
 }
-
 
 function startScreenLoop() {
 	clearCanvas();
 	ctx.stroke(instructionsPath);
-	ctx.strokeRect(70,90,60,30)
-	ctx.fillText("Start", midpointW, 110);
+	drawStartButon("S T A R T");
+	if (canvasButtons) { canvasButtons.drawButtons(); }
+
 	//console.debug(idleSnekInputCounter, idleSnek.movementCounter);
 	if (idleSnekInputCounter-- <= 0) {
 		idleSnekInputCounter = idleSnek.rateOfMovement;
@@ -394,17 +693,18 @@ function gameOver() {
 
 function gameOverLoop() {
 	clearCanvas();
-	
+	if (canvasButtons) { canvasButtons.drawButtons(); }
 	snek.tick();
 	at.tick();
 	
-	ctx.clearRect(0,45,canvas.width,30);
-	ctx.clearRect(70,90,60,30);
-	ctx.strokeRect(70,90,60,30);
+	ctx.clearRect(0,45,mainCanvas.width,30);
+//	ctx.clearRect(70,90,60,30);
+//	ctx.strokeRect(70,90,60,30);
 	ctx.fillText("G A M E   O V E R", midpointW, 69);
 	ctx.fillText("G A M E   O V E R", midpointW, 69);
 	ctx.fillText("G A M E   O V E R", midpointW, 69);	// net effect makes the text look bolder
-	ctx.fillText("Retry", midpointW, 110);
+
+	drawStartButon("R E T R Y");
 }
 
 function newGame() {
@@ -417,9 +717,15 @@ function newGame() {
 	looping = setInterval(gamePlayLoop, loopTime);
 }
 
-function restart(x,y) {
+function old_restart(x,y) {
 	let restartButton = [70,90,130,120];
 	if (!isPlaying && checkIfInArea(restartButton, [x,y])){
+		newGame();
+	}
+}
+
+function restart(x,y) {
+	if (!isPlaying && startButtonRange.inArea(x,y)) {
 		newGame();
 	}
 }
@@ -448,6 +754,10 @@ function updateHighScore(score){
 	}
 }
 
+function clearHighScore() {
+	localStorage.setItem("highScore",0)
+}
+
 function getHighScore(){
 	let score = parseInt(localStorage.getItem("highScore"));
 	if (isNaN(score)) { return 0; }
@@ -455,24 +765,40 @@ function getHighScore(){
 }
 
 function playPause() {
-	if(isLooping){
-		clearInterval(looping);
-		isLooping = false;
+//	if(isLooping){
+	if(snek.movable){
+//		clearInterval(looping);
+//		isLooping = false;
+		snek.movable = false;
 	} else {
-		looping = setInterval(gamePlayLoop, loopTime);
-		isLooping = true;
+//		looping = setInterval(gamePlayLoop, loopTime);
+//		isLooping = true;
+		snek.movable = true;
+	}
+}
+
+function checkForPauseButton() {
+	if (pauseDebounce-- < 0 && keys.Action) {
+			pauseDebounce = 10;
+			playPause();
 	}
 }
 
 function oneFrame() {
-	//gamePlayLoop();
-	startScreenLoop();
+	gamePlayLoop();
+	//startScreenLoop();
 }
 
 function gamePlayLoop() {
 	clearCanvas();
-	snek.tick();
+	if (canvasButtons) {
+		sendButtonsToKeys();
+		canvasButtons.drawButtons();
+		checkForPauseButton();
+	}
+//	console.log(keys);
 	at.tick();
+	snek.tick();
 	updateScore(snek.getLength());
 }
 
@@ -488,13 +814,21 @@ function extraLife() {
 }
 
 function lvlUp() {
-	ctx.fillText("L E V E L   U P", canvas.width/2, canvas.height/2);
+	ctx.fillText("L E V E L   U P", mainCanvas.width/2, mainCanvas.height/2);
 	cheating = true;
 	snek.length += snek.sppedIncreaseRate;
 	snek.rateOfMovement--;
 }
 
+function mobileBrowser() {
+	return (navigator.userAgentData && navigator.userAgentData.mobile);
+}
+
 function setup(){
+//	if (mobileBrowser()) {
+	if (isTallerThanWide()) {
+		setupCanvasButons()
+	}
 	highScore = getHighScore();
 	longthistField.innerText = highScore;
 	idleSnek = new Snek(gridPoints , segmentSize, true);
@@ -502,13 +836,19 @@ function setup(){
 	idleSnek.rateOfMovement = 9;
 	idleSnekInputCounter = idleSnek.rateOfMovement;
 	idlePointer = 0;
+	pauseDebounce = 0;
 	idlePath = ['R','R','R','R','R','R','R','D','D','D','L','L','D','L','L','L','U','L','L','U','U','L','L','L','U','L','L','D','D','L','L','L','D','D','D','R','R','R','R','R','U','R','R','U','U','R','U','U'];
 }
 
-var snek, at, highScore, cheating, idleSnek, idleSnekInputCounter, idlePointer, idlePath
+var snek, at, highScore, cheating, idleSnek, idleSnekInputCounter, idlePointer, idlePath, canvasButtons, pauseDebounce
 setup();
 var looping = setInterval(startScreenLoop, loopTime);
 var isPlaying = false;
 var isLooping = true;
 //clearInterval(looping);
+
+
 </script>
+
+
+
